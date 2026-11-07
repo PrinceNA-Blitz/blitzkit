@@ -1,6 +1,6 @@
 import { blueDark, orangeDark } from "@radix-ui/colors";
-import { ContactShadows } from "@react-three/drei";
-import { invalidate, useFrame } from "@react-three/fiber";
+import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
+import { invalidate, useFrame, useThree } from "@react-three/fiber";
 import { clamp, times } from "lodash-es";
 import { Quicklime } from "quicklime";
 import {
@@ -16,7 +16,7 @@ import { Tankopedia } from "../../../../../../stores/tankopedia";
 import { TankopediaPersistent } from "../../../../../../stores/tankopediaPersistent";
 import { TankopediaDisplay } from "../../../../../../stores/tankopediaPersistent/constants";
 
-const ANGLE = degToRad(15);
+const ANGLE = degToRad(25);
 const REVEAL_ANIMATION_TIME = 3;
 export const TRANSITION_ANIMATION_TIME = 0.5;
 
@@ -31,6 +31,8 @@ const INTENSITY_0 = 2 ** 6;
 const INTENSITY_1 = 2 ** 3;
 const HEMISPHERE_INTENSITY = 2 ** 0.7;
 const NON_PBR_FACTOR = 2;
+// soft studio reflections so metal surfaces have something to reflect
+const ENVIRONMENT_INTENSITY = 2 ** -0.5;
 
 const SHADOW_RESOLUTION = 2 ** 9;
 const SHADOW_FOCUS = 2 ** 0;
@@ -125,6 +127,30 @@ export function Lighting({ hasPbr }: Props) {
         renderOrder={1}
       />
 
+      <Environment resolution={2 ** 7}>
+        <Lightformer
+          form="rect"
+          intensity={2}
+          position={[0, 5, 0]}
+          rotation-x={Math.PI / 2}
+          scale={[10, 10, 1]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1}
+          position={[-5, 1, -1]}
+          rotation-y={Math.PI / 2}
+          scale={[10, 2, 1]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1}
+          position={[5, 1, 1]}
+          rotation-y={-Math.PI / 2}
+          scale={[10, 2, 1]}
+        />
+      </Environment>
+
       {animate && (
         <Animator
           hasPbr={hasPbr}
@@ -166,7 +192,7 @@ export function Lighting({ hasPbr }: Props) {
               position={position}
               intensity={intensity}
               userData={{ intensity }}
-              penumbra={1}
+              penumbra={0.5}
               castShadow={highGraphics}
               decay={1}
               color="#ffffff"
@@ -202,6 +228,7 @@ function Animator({
 }: AnimatorProps) {
   const requestedDisplay = Tankopedia.use((state) => state.requestedDisplay);
   const display = Tankopedia.use((state) => state.display);
+  const scene = useThree((state) => state.scene);
 
   const factor =
     !hasPbr && display !== TankopediaDisplay.StaticArmor ? NON_PBR_FACTOR : 1;
@@ -212,6 +239,8 @@ function Animator({
 
   const apply = useCallback((t: number) => {
     if (!wrapper.current) return;
+
+    scene.environmentIntensity = ENVIRONMENT_INTENSITY * t;
 
     for (const child of wrapper.current.children) {
       if (child instanceof SpotLight) {
