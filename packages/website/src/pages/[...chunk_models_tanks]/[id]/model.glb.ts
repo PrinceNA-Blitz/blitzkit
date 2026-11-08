@@ -386,6 +386,11 @@ export async function extractMaterials(
         );
       }
 
+      if (!textures.baseRMMap) {
+        // glTF defaults to fully metallic, which renders near black
+        material.setMetallicFactor(0);
+      }
+
       if (textures.baseRMMap) {
         material.setMetallicRoughnessTexture(
           document

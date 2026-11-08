@@ -2,6 +2,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import type { QuicklimeEvent } from "quicklime";
 import { forwardRef, Suspense, useEffect, useRef } from "react";
+import { NeutralToneMapping } from "three";
 import type { OrbitControls as OrbitControlsClass } from "three-stdlib";
 import { controlsEnabledEvent } from "../../core/controlsEnabled";
 import { Lighting } from "../Tankopedia/HeroSection/components/TankSandbox/components/Lighting";
@@ -29,6 +30,7 @@ export const MixerScene = forwardRef<HTMLCanvasElement>((_, ref) => {
     <Canvas
       ref={ref}
       shadows="soft"
+      gl={{ toneMapping: NeutralToneMapping }}
       style={{ background: "black" }}
       camera={{
         fov: 45,

@@ -1,6 +1,6 @@
 import { blueDark, orangeDark } from "@radix-ui/colors";
-import { ContactShadows } from "@react-three/drei";
-import { invalidate, useFrame } from "@react-three/fiber";
+import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
+import { invalidate, useFrame, useThree } from "@react-three/fiber";
 import { clamp, times } from "lodash-es";
 import { Quicklime } from "quicklime";
 import {
@@ -16,7 +16,7 @@ import { Tankopedia } from "../../../../../../stores/tankopedia";
 import { TankopediaPersistent } from "../../../../../../stores/tankopediaPersistent";
 import { TankopediaDisplay } from "../../../../../../stores/tankopediaPersistent/constants";
 
-const ANGLE = degToRad(15);
+const ANGLE = degToRad(25);
 const REVEAL_ANIMATION_TIME = 3;
 export const TRANSITION_ANIMATION_TIME = 0.5;
 
@@ -30,10 +30,48 @@ const LIGHT_HEIGHT_1 = 10;
 const INTENSITY_0 = 2 ** 6;
 const INTENSITY_1 = 2 ** 3;
 const HEMISPHERE_INTENSITY = 2 ** 0.7;
-const NON_PBR_FACTOR = 2;
+// non-PBR materials are plain diffuse, so they need less light than PBR ones
+// to land at the same brightness
+const NON_PBR_LIGHT_SCALE = 2 ** -0.75;
+// soft studio reflections so metal surfaces have something to reflect
+const ENVIRONMENT_INTENSITY = 2 ** -0.5;
 
 const SHADOW_RESOLUTION = 2 ** 9;
 const SHADOW_FOCUS = 2 ** 0;
+
+// kept stable so drei doesn't re-render the env map and reset its intensity
+// every time Lighting re-renders
+const LIGHTFORMERS = (
+  <>
+    <Lightformer
+      form="rect"
+      intensity={2}
+      position={[0, 5, 0]}
+      rotation-x={Math.PI / 2}
+      scale={[10, 10, 1]}
+    />
+    <Lightformer
+      form="rect"
+      intensity={1}
+      position={[-5, 1, -1]}
+      rotation-y={Math.PI / 2}
+      scale={[10, 2, 1]}
+    />
+    <Lightformer
+      form="rect"
+      intensity={1}
+      position={[5, 1, 1]}
+      rotation-y={-Math.PI / 2}
+      scale={[10, 2, 1]}
+    />
+  </>
+);
+
+function lightScale(hasPbr: boolean, display: TankopediaDisplay) {
+  return !hasPbr && display !== TankopediaDisplay.StaticArmor
+    ? NON_PBR_LIGHT_SCALE
+    : 1;
+}
 
 export const transitionEvent = new Quicklime<number>(0);
 
@@ -46,6 +84,7 @@ export function Lighting({ hasPbr }: Props) {
 
   const highGraphics = TankopediaPersistent.use((state) => state.highGraphics);
   const requestedDisplay = Tankopedia.use((state) => state.requestedDisplay);
+  const display = Tankopedia.use((state) => state.display);
   const revealed = Tankopedia.use((state) => state.revealed);
   const skinPending = Tankopedia.use(
     (state) =>
@@ -125,6 +164,15 @@ export function Lighting({ hasPbr }: Props) {
         renderOrder={1}
       />
 
+      <Environment
+        resolution={2 ** 7}
+        environmentIntensity={
+          ENVIRONMENT_INTENSITY * lightScale(hasPbr, display)
+        }
+      >
+        {LIGHTFORMERS}
+      </Environment>
+
       {animate && (
         <Animator
           hasPbr={hasPbr}
@@ -166,7 +214,7 @@ export function Lighting({ hasPbr }: Props) {
               position={position}
               intensity={intensity}
               userData={{ intensity }}
-              penumbra={1}
+              penumbra={0.5}
               castShadow={highGraphics}
               decay={1}
               color="#ffffff"
@@ -202,9 +250,9 @@ function Animator({
 }: AnimatorProps) {
   const requestedDisplay = Tankopedia.use((state) => state.requestedDisplay);
   const display = Tankopedia.use((state) => state.display);
+  const scene = useThree((state) => state.scene);
 
-  const factor =
-    !hasPbr && display !== TankopediaDisplay.StaticArmor ? NON_PBR_FACTOR : 1;
+  const scale = lightScale(hasPbr, display);
 
   useEffect(() => {
     invalidate();
@@ -213,16 +261,18 @@ function Animator({
   const apply = useCallback((t: number) => {
     if (!wrapper.current) return;
 
+    scene.environmentIntensity = ENVIRONMENT_INTENSITY * t * scale;
+
     for (const child of wrapper.current.children) {
       if (child instanceof SpotLight) {
-        child.angle = ANGLE * t * factor;
-        child.intensity = child.userData.intensity;
+        child.angle = ANGLE * t;
+        child.intensity = child.userData.intensity * scale;
 
         if (child.angle === 0) {
           child.intensity = 0;
         }
       } else if (child instanceof HemisphereLight) {
-        child.intensity = HEMISPHERE_INTENSITY * t * factor;
+        child.intensity = HEMISPHERE_INTENSITY * t * scale;
       }
     }
 
