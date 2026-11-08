@@ -30,7 +30,9 @@ const LIGHT_HEIGHT_1 = 10;
 const INTENSITY_0 = 2 ** 6;
 const INTENSITY_1 = 2 ** 3;
 const HEMISPHERE_INTENSITY = 2 ** 0.7;
-const NON_PBR_FACTOR = 2;
+// non-PBR materials are plain diffuse, so they need less light than PBR ones
+// to land at the same brightness
+const NON_PBR_LIGHT_SCALE = 2 ** -0.75;
 // soft studio reflections so metal surfaces have something to reflect
 const ENVIRONMENT_INTENSITY = 2 ** -0.5;
 
@@ -65,6 +67,12 @@ const LIGHTFORMERS = (
   </>
 );
 
+function lightScale(hasPbr: boolean, display: TankopediaDisplay) {
+  return !hasPbr && display !== TankopediaDisplay.StaticArmor
+    ? NON_PBR_LIGHT_SCALE
+    : 1;
+}
+
 export const transitionEvent = new Quicklime<number>(0);
 
 interface Props {
@@ -76,6 +84,7 @@ export function Lighting({ hasPbr }: Props) {
 
   const highGraphics = TankopediaPersistent.use((state) => state.highGraphics);
   const requestedDisplay = Tankopedia.use((state) => state.requestedDisplay);
+  const display = Tankopedia.use((state) => state.display);
   const revealed = Tankopedia.use((state) => state.revealed);
   const skinPending = Tankopedia.use(
     (state) =>
@@ -157,7 +166,9 @@ export function Lighting({ hasPbr }: Props) {
 
       <Environment
         resolution={2 ** 7}
-        environmentIntensity={ENVIRONMENT_INTENSITY}
+        environmentIntensity={
+          ENVIRONMENT_INTENSITY * lightScale(hasPbr, display)
+        }
       >
         {LIGHTFORMERS}
       </Environment>
@@ -241,8 +252,7 @@ function Animator({
   const display = Tankopedia.use((state) => state.display);
   const scene = useThree((state) => state.scene);
 
-  const factor =
-    !hasPbr && display !== TankopediaDisplay.StaticArmor ? NON_PBR_FACTOR : 1;
+  const scale = lightScale(hasPbr, display);
 
   useEffect(() => {
     invalidate();
@@ -251,18 +261,18 @@ function Animator({
   const apply = useCallback((t: number) => {
     if (!wrapper.current) return;
 
-    scene.environmentIntensity = ENVIRONMENT_INTENSITY * t;
+    scene.environmentIntensity = ENVIRONMENT_INTENSITY * t * scale;
 
     for (const child of wrapper.current.children) {
       if (child instanceof SpotLight) {
-        child.angle = ANGLE * t * factor;
-        child.intensity = child.userData.intensity;
+        child.angle = ANGLE * t;
+        child.intensity = child.userData.intensity * scale;
 
         if (child.angle === 0) {
           child.intensity = 0;
         }
       } else if (child instanceof HemisphereLight) {
-        child.intensity = HEMISPHERE_INTENSITY * t * factor;
+        child.intensity = HEMISPHERE_INTENSITY * t * scale;
       }
     }
 
