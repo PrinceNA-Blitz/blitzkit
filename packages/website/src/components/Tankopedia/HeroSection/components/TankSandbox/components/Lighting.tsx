@@ -37,6 +37,34 @@ const ENVIRONMENT_INTENSITY = 2 ** -0.5;
 const SHADOW_RESOLUTION = 2 ** 9;
 const SHADOW_FOCUS = 2 ** 0;
 
+// kept stable so drei doesn't re-render the env map and reset its intensity
+// every time Lighting re-renders
+const LIGHTFORMERS = (
+  <>
+    <Lightformer
+      form="rect"
+      intensity={2}
+      position={[0, 5, 0]}
+      rotation-x={Math.PI / 2}
+      scale={[10, 10, 1]}
+    />
+    <Lightformer
+      form="rect"
+      intensity={1}
+      position={[-5, 1, -1]}
+      rotation-y={Math.PI / 2}
+      scale={[10, 2, 1]}
+    />
+    <Lightformer
+      form="rect"
+      intensity={1}
+      position={[5, 1, 1]}
+      rotation-y={-Math.PI / 2}
+      scale={[10, 2, 1]}
+    />
+  </>
+);
+
 export const transitionEvent = new Quicklime<number>(0);
 
 interface Props {
@@ -127,28 +155,11 @@ export function Lighting({ hasPbr }: Props) {
         renderOrder={1}
       />
 
-      <Environment resolution={2 ** 7}>
-        <Lightformer
-          form="rect"
-          intensity={2}
-          position={[0, 5, 0]}
-          rotation-x={Math.PI / 2}
-          scale={[10, 10, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={1}
-          position={[-5, 1, -1]}
-          rotation-y={Math.PI / 2}
-          scale={[10, 2, 1]}
-        />
-        <Lightformer
-          form="rect"
-          intensity={1}
-          position={[5, 1, 1]}
-          rotation-y={-Math.PI / 2}
-          scale={[10, 2, 1]}
-        />
+      <Environment
+        resolution={2 ** 7}
+        environmentIntensity={ENVIRONMENT_INTENSITY}
+      >
+        {LIGHTFORMERS}
       </Environment>
 
       {animate && (
